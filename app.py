@@ -9,6 +9,8 @@ import pyrebase
 import requests
 from datetime import timedelta, date
 
+
+
 UPLOAD_FOLDER = "./uploads"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
@@ -18,6 +20,7 @@ def allowed_files(filename):
 
 
 app = Flask(__name__)
+
 
 # mysql-config
 app.config["MYSQL_HOST"] = "localhost"
@@ -29,7 +32,9 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 mysql = MySQL(app)
 CORS(app)
 
-#firebase config
+
+
+# firebase-config
 config = {
   "apiKey": "AIzaSyAPexuYLPwvm5tRSgaNptYSsz3UNVx6WYE",
   "authDomain": "gyaanvanam.firebaseapp.com",
@@ -37,60 +42,57 @@ config = {
   "storageBucket": "gyaanvanam.appspot.com",
   "messagingSenderId": "270279882104",
   "appId": "1:270279882104:web:1768d4dc82521dd2ecc48d",
-  "serviceAccount": "./keyfile.json"
-
+  "serviceAccount": "./keyfile.json",
+  "databaseURL":"https://gyaanvanam-default-rtdb.asia-southeast1.firebasedatabase.app/"
 }
 
-#init firebase app
 firebase = pyrebase.initialize_app(config)
-#firebase storage
 storage = firebase.storage()
 
 
+
 # Add a book to the DB
-@app.route("/api/addbookpage", methods=["POST"])
+@app.route("/api/addbook", methods=["POST"])
 def addbook():
- if request.method == "POST":
+    if request.method == "POST":
 
         title = request.form.get("title")
         author = request.form.get("author")
         genre = request.form.get("genre")
         description = request.form.get("desc")
+
         cover = request.files["cover"]
 
         if cover and allowed_files(cover.filename):
             filename = str(uuid.uuid4())
             filename += "."
             filename += cover.filename.split(".")[1]
-            #create secure name
             filename_secure = secure_filename(filename)
 
             cover.save(os.path.join(app.config["UPLOAD_FOLDER"], filename_secure))
 
-            #local file
             local_filename = "./uploads/"
             local_filename += filename_secure
-
-            #firebase filename
             firebase_filename = "uploads/"
             firebase_filename += filename_secure
 
-            #upload the file
             storage.child(firebase_filename).put(local_filename)
-            #get the url of the file
+
             cover_image = storage.child(firebase_filename).get_url(None)
-            #get cursor to exec the mysql functions
-            cur = mysql.connection.cursor()
+
+            cursor = mysql.connection.cursor()
 
             query = "INSERT INTO books (title, author, genre, cover, description) VALUES ('"+ str(title)+"','"+str(author)+"','"+str(genre)+"','"+str(cover_image)+"','"+str(description)+"');"
-            cur.execute(query)
+            cursor.execute(query)
             mysql.connection.commit()
 
             os.remove(os.path.join(app.config["UPLOAD_FOLDER"], filename_secure))
-
+            cursor.close()
             return jsonify(data="the post was created successfully")
 
-  # Register a new user
+
+
+# Register a new user
 @app.route("/api/adduser", methods=["POST"])
 def adduser():
     if request.method == "POST":
@@ -109,12 +111,13 @@ def adduser():
         cur.execute(query)
         user = cur.fetchall()
         full_id = "LISUSER" + str(user[-1][0])
+        cur.close()
 
         return jsonify(data=full_id)
 
 
 
-  # Default recommendation: the latest books added to the DB
+# Default recommendation: the latest books added to the DB
 @app.route("/api/reccs", methods=["GET"])
 def default_reccs():
     if request.method == 'GET':
@@ -124,9 +127,9 @@ def default_reccs():
         query = "SELECT * FROM books;"
         cur.execute(query)
         posts = (cur.fetchall())[-3:]
-
+        cur.close()
         return jsonify(data=posts)
-          
+        
 
 
 # Retrieve book details
@@ -139,8 +142,10 @@ def book_info(bid):
         query = "SELECT * FROM books WHERE id="+bid+";"
         cur.execute(query)
         posts = cur.fetchone()
-
+        cur.close()
         return jsonify(data=posts)
+
+
 
 # Validate a user
 @app.route("/api/validateuser", methods=["POST"])
@@ -163,7 +168,9 @@ def validateuser():
         if user and user[3]==pwd:
             return jsonify(data=full_id)
         
+        cur.close()
         return jsonify(data="Invalid")
+
 
 
 # Retrieve user details for the profile
@@ -210,6 +217,7 @@ def user_info(uid):
         for i in books_borr:
             details.append(i)
 
+        cur.close()
         return jsonify(data=details)
 
 
@@ -262,8 +270,10 @@ def borrow(bid, uid):
         query = "INSERT INTO history (userid, bookid) VALUES ("+uid+","+bid+");"
         cur.execute(query)
         mysql.connection.commit()
+        cur.close()
 
         return jsonify(data=posts)
+
 
 
 # The logic behind the recommendation system
@@ -301,6 +311,7 @@ def recomendation():
     result = {"data":reccs}
 
     return jsonify(result)
+
 
 
 # Generate custom recommendation
@@ -341,7 +352,10 @@ def custom_reccs(uid):
             book_det = cur.fetchone()
             result.append(book_det)
 
+        cur.close()
+
         return jsonify(data=result)
+
 
 
 # Return a book
@@ -377,8 +391,10 @@ def returnBook(bid, uid):
         query = "UPDATE borrow SET "+update_column_book+" = NULL, "+update_column_ret+" = NULL WHERE id="+uid+";"
         cur.execute(query)
         mysql.connection.commit()
+        cur.close()
 
         return jsonify(data=posts)
+
 
 
 # Renew book
@@ -422,6 +438,7 @@ def renewBook(bid, uid):
         query = "INSERT INTO history (userid, bookid) VALUES ("+uid+","+bid+");"
         cur.execute(query)
         mysql.connection.commit()
+        cur.close()
 
         return jsonify(data=posts)
 
@@ -455,8 +472,10 @@ def searchBooks(starting):
             cur.execute(query)
             book_det = cur.fetchone()
             result.append(book_det)
-        
+        cur.close()
+
         return jsonify(data=result)
+
 
 
 # Search for a book wrt title: but the title is not entered
@@ -465,10 +484,9 @@ def searchBooksEmpty():
     if request.method == 'GET':
         return jsonify(data="Type something!")
 
+        
 
-          
-
- # Search for a book wrt the keyword
+# Search for a book wrt the keyword
 @app.route("/api/searchKey/<starting>", methods=["GET"])
 def searchKey(starting):
     if request.method == 'GET':
@@ -496,7 +514,8 @@ def searchKey(starting):
             cur.execute(query)
             book_det = cur.fetchone()
             result.append(book_det)
-        
+        cur.close()
+
         return jsonify(data=result)
 
 
