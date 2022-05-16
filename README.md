@@ -9,8 +9,7 @@ Gyaanvanam is a library management app developed by students for students.
 * As Database: `MySQL`
 
 #### Front-end
-* Tools: `Angular 12`
-* Styling Framework: `BOOTSTRAP`
+* Tools: `Angular CLI`
 
 ### Prerequisites
 Make sure you have installed all of the following prerequisites on your development machine:
