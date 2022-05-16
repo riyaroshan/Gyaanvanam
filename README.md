@@ -6,7 +6,6 @@ Gyaanvanam is a library management app developed by students for students.
 
 #### Back-end
 * For handling server requests: `Flask`
-* API: `T API`
 * As Database: `MySQL`
 
 #### Front-end
